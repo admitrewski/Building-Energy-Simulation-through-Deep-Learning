@@ -190,6 +190,14 @@ class EplusEnv(gym.Env):
 
         # Reward class
         self.cls_reward = SimpleReward()
+        
+
+        ### EDIT STARTS ###
+
+        self.current_obs = None
+
+        ### EDIT ENDS ###
+
 
     def step(self, action):
         """Sends action to the environment.
@@ -240,7 +248,17 @@ class EplusEnv(gym.Env):
             'temperature': temp,
             'out_temperature': obs_dict['Site Outdoor Air Drybulb Temperature']
         }
-        return np.array(list(obs_dict.values())), reward, done, info
+
+        ### EDIT STARTS ###
+
+        # so that the current observations are accessible for the data assimilation:
+        self.current_obs = np.array(list(obs_dict.values()))        
+
+
+        return self.current_obs, reward, done, info
+
+        ### EDIT ENDS ###
+
 
     def reset(self):
         """Reset the environment.
@@ -262,6 +280,42 @@ class EplusEnv(gym.Env):
         obs_dict['hour'] = time_info[2]
 
         return np.array(list(obs_dict.values()))
+
+
+    ### EDIT STARTS ###        
+
+    def update_temp(self, actual_temp, background_var = 0.0005, actual_var = 0.5):
+        
+        alpha = actual_var/background_var
+
+        # DA for indoor temp only:
+        self.current_obs[8] = self.current_obs[8] + (1/(1 + alpha)) * (actual_temp - self.current_obs[8])
+
+
+    def update_power(self, actual_power):
+        background_var = 0.0005
+        actual_var = 0.5
+
+        alpha = actual_var/background_var
+
+        # DA for power only:
+        self.current_obs[15] = self.current_obs[15] + (1/(1 + alpha)) * (actual_power - self.current_obs[15])
+
+
+    def update_both(self, actual_temp, actual_power):
+        background_var = 0.0005
+        actual_var = 0.5
+
+        alpha = actual_var/background_var
+
+        # DA for both temp and power:
+        self.current_obs[8] = self.current_obs[8] + (1/(1 + alpha)) * (actual_temp - self.current_obs[8])
+        self.current_obs[15] = self.current_obs[15] + (1/(1 + alpha)) * (actual_power - self.current_obs[15])
+
+
+    ### EDIT ENDS ###
+
+
 
     def render(self, mode='human'):
         """Environment rendering."""
